@@ -860,8 +860,6 @@
   </footer>
 
   <script>
-    // Google Apps Script web app URL (deployed Code.gs)
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwXE1v5E7Y2eO0ViyYqhD75m0ta7WDx-jZFwpJfZbtKzIP-giZ2ugAlhAURlYisa6e73w/exec';
 
     // Mobile menu toggle
     const menuToggle = document.getElementById('menuToggle');
@@ -891,53 +889,62 @@
     });
 
     // Lead form -> Google Apps Script (saves Name, Email, Phone to the "Responses" tab)
+    // Works when opened as a local file (file://).
+    // Request is GET + no-cors, so the response is opaque: we only know the request was sent.
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxhhJb7I2W0qvKSnjbK86BppJxHMPupdL3qAAHp3s1upNHVO3ErSunEeOFRtk3J6BgCOg/exec';
+
     const leadForm = document.getElementById('leadForm');
     const formStatus = document.getElementById('formStatus');
     const submitBtn = document.getElementById('submitBtn');
+    const submitBtnHTML = submitBtn.innerHTML;
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    leadForm.addEventListener('submit', async (e) => {
+    function setStatus(type, message) {
+      formStatus.className = 'form-status' + (type ? ' ' + type : '');
+      formStatus.textContent = message;
+    }
+
+    function resetButton() {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = submitBtnHTML;
+    }
+
+    function showSuccess() {
+      setStatus('ok', 'Thank you! You are now on the list.');
+      leadForm.reset();
+      resetButton();
+    }
+
+    function showError() {
+      setStatus('err', 'Something went wrong. Please try again in a moment.');
+      resetButton();
+    }
+
+    leadForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      formStatus.className = 'form-status';
+      setStatus('', '');
 
       const name = leadForm.name.value.trim();
       const phone = leadForm.phone.value.trim();
       const email = leadForm.email.value.trim();
 
       if (!name || !phone || !email) {
-        formStatus.classList.add('err');
-        formStatus.textContent = 'Please fill in your name, mobile number and email.';
+        setStatus('err', 'Please fill in your name, mobile number and email.');
         return;
       }
       if (!emailPattern.test(email)) {
-        formStatus.classList.add('err');
-        formStatus.textContent = 'Please enter a valid email address.';
+        setStatus('err', 'Please enter a valid email address.');
         return;
       }
 
       submitBtn.disabled = true;
       submitBtn.textContent = 'Sending…';
 
-      try {
-        const params = new URLSearchParams({ name, email, phone });
-        const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET' });
-        const data = await res.json();
+      const url = SCRIPT_URL + '?' + new URLSearchParams({ name: name, email: email, phone: phone });
 
-        if (data.success) {
-          formStatus.classList.add('ok');
-          formStatus.textContent = 'Thank you! You are now on the list.';
-          leadForm.reset();
-        } else {
-          throw new Error(data.error || 'Save failed');
-        }
-      } catch (err) {
-        formStatus.classList.add('err');
-        formStatus.textContent = 'Something went wrong. Please try again in a moment.';
-        console.error(err);
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Send me fragrance updates';
-      }
+      fetch(url, { method: 'GET', mode: 'no-cors' })
+        .then(() => showSuccess())
+        .catch(() => showError());
     });
   </script>
 </body>
